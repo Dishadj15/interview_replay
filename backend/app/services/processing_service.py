@@ -128,7 +128,7 @@ class ProcessingService:
     @staticmethod
     def _transcribe_fallback(file_path: str):
         model = WhisperModel(
-            "base",
+            "tiny",
             device="cpu",
             compute_type="int8",
         )
