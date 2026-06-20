@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from faster_whisper import WhisperModel
 import json
 import math
 import re
@@ -13,14 +13,16 @@ from app.config import get_settings
 settings = get_settings()
 
 FILLER_WORDS = [
-    "um",
+    "umm",
+    "umhm",
     "uh",
-    "er",
+    "ahhh"
+    "errrr",
     "ah",
     "like",
-    "you know",
-    "sort of",
-    "kind of",
+    "youknow",
+    "sortof",
+    "kindof",
     "basically",
     "actually",
     "literally",
@@ -124,21 +126,36 @@ class ProcessingService:
         return response.text.strip(), words
 
     @staticmethod
-    def _transcribe_fallback(file_path: str) -> tuple[str, list[dict[str, float | str]]]:
-        duration = ProcessingService.get_audio_duration_seconds(file_path)
-        transcript = (
-            "Transcription unavailable without OPENAI_API_KEY. "
-            "Upload completed and audio metrics were analyzed from the recording. "
-            "Configure OPENAI_API_KEY in backend/.env to enable Whisper transcription."
+    def _transcribe_fallback(file_path: str):
+        model = WhisperModel(
+            "base",
+            device="cpu",
+            compute_type="int8",
         )
-        words = [
-            {
-                "word": word,
-                "start": idx * (duration / 20),
-                "end": (idx + 1) * (duration / 20),
-            }
-            for idx, word in enumerate(transcript.split())
-        ]
+
+        segments, info = model.transcribe(
+            file_path,
+            word_timestamps=True,
+        )
+
+        transcript_parts = []
+        words = []
+
+        for segment in segments:
+            transcript_parts.append(segment.text)
+
+            if hasattr(segment, "words") and segment.words:
+                for word in segment.words:
+                    words.append(
+                        {
+                            "word": str(word.word).strip(),
+                            "start": float(word.start),
+                            "end": float(word.end),
+                        }
+                    )
+
+        transcript = " ".join(transcript_parts).strip()
+
         return transcript, words
 
     @staticmethod
